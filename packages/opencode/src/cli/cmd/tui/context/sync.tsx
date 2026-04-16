@@ -30,6 +30,7 @@ import { useArgs } from "./args"
 import { batch, createEffect, on } from "solid-js"
 import { Log } from "@/util"
 import { emptyConsoleState, type ConsoleState } from "@/config/console-state"
+import { useKV } from "./kv"
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -107,6 +108,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     const event = useEvent()
     const project = useProject()
     const sdk = useSDK()
+    const kv = useKV()
+    const [autoaccept] = kv.signal<"none" | "edit">("permission_auto_accept", "edit")
 
     event.subscribe((event) => {
       switch (event.type) {
@@ -130,6 +133,13 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
         case "permission.asked": {
           const request = event.properties
+          if (autoaccept() === "edit" && request.permission === "edit") {
+            sdk.client.permission.reply({
+              reply: "once",
+              requestID: request.id,
+            })
+            break
+          }
           const requests = store.permission[request.sessionID]
           if (!requests) {
             setStore("permission", request.sessionID, [request])
